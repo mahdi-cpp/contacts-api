@@ -1,4 +1,4 @@
-package chat
+package contact
 
 import (
 	"fmt"
@@ -10,17 +10,17 @@ func (c *UpdateOptions) ValidateUpdate() error {
 	return nil
 }
 
-func (c *Chat) Validate() error {
+func (c *Contact) Validate() error {
 
-	err := validateUsername(c.Username)
+	err := validateUsername(c.FirstName)
 	if err != nil {
 		return err
 	}
 
-	err = typeValidate(c.Type)
-	if err != nil {
-		return err
-	}
+	//err = typeValidate(c.Type)
+	//if err != nil {
+	//	return err
+	//}
 
 	const maxDescriptionLength = 50
 	if len(strings.TrimSpace(c.Description)) > maxDescriptionLength {
@@ -28,13 +28,13 @@ func (c *Chat) Validate() error {
 	}
 
 	const maxInviteLinkLength = 500
-	if len(strings.TrimSpace(c.InviteLink)) > maxInviteLinkLength {
+	if len(strings.TrimSpace(c.LastName)) > maxInviteLinkLength {
 		return fmt.Errorf("inviteLink length exceeds the maximum of %d characters", maxInviteLinkLength)
 	}
 
 	// Validate all member data using the Member's own Validate method.
 	//membersMap := make(map[uuid.UUID]struct{})
-	//for _, member := range c.MembersCount {
+	//for _, member := range c.Phones {
 	//
 	//	// Call the Validate method on the member struct itself.
 	//	if err := member.validate(); err != nil {
@@ -53,7 +53,7 @@ func (c *Chat) Validate() error {
 	return nil
 }
 
-// ValidateUsername checks if the Username field of the Chat struct is valid.
+// ValidateUsername checks if the Username field of the Contact struct is valid.
 // A valid username:
 // - Must be between 5 and 32 characters long.
 // - Can contain alphanumeric characters and underscores.
@@ -62,7 +62,7 @@ func (c *Chat) Validate() error {
 // - Cannot have consecutive underscores.
 func validateUsername(username string) error {
 
-	if username == "" { //also can empty in private , group collection
+	if username == "" { //also can empty in private , groups collection
 		return nil
 	}
 
@@ -92,7 +92,7 @@ func typeValidate(messageType string) error {
 
 	validTypes := map[string]struct{}{
 		"private": {},
-		"group":   {},
+		"groups":  {},
 		"channel": {},
 		"bot":     {},
 	}

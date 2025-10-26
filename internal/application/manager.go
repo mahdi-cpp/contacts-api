@@ -1,54 +1,44 @@
 package application
 
 import (
-	"path/filepath"
+	"fmt"
 	"sync"
 
-	"github.com/mahdi-cpp/contacts-api/internal/collections/chat"
-	"github.com/mahdi-cpp/contacts-api/internal/config"
+	"github.com/google/uuid"
+	"github.com/mahdi-cpp/contacts-api/internal/account"
 )
 
 type AppManager struct {
-	mu          sync.RWMutex
-	chatManager *chat.Manager
-	createChat  chan *chat.Chat
+	mu              sync.RWMutex
+	accountManagers map[uuid.UUID]*account.Manager //key is userID
 }
 
 func New() (*AppManager, error) {
 
 	manager := &AppManager{
-		createChat: make(chan *chat.Chat, 100),
-	}
-
-	var err error
-	var chatsDirectory = filepath.Join(config.RootDir, "metadata")
-	manager.chatManager, err = chat.NewManager(chatsDirectory, "chats")
-	if err != nil {
-		panic(err)
+		accountManagers: make(map[uuid.UUID]*account.Manager),
 	}
 
 	return manager, nil
 }
 
-func (m *AppManager) GetChatManager() (*chat.Manager, error) {
+func (m *AppManager) GetAccountManager(userID uuid.UUID) (*account.Manager, error) {
 
-	//messageManager, ok := m.messageManagers[chatID]
-	//if ok {
-	//	return messageManager, nil
-	//}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	//chat1, err := m.ChatCollectionManager.Read(chatID)
-	//if err != nil {
-	//	fmt.Println("chat not found in cash")
-	//	return nil, err
-	//}
+	if userID == uuid.Nil {
+		return nil, fmt.Errorf("account is nil")
+	}
 
-	//messageManager, err := message.New(chatID, "")
-	//if err != nil {
-	//	fmt.Println(err)
-	//}
-	//
-	//m.messageManagers[chatID] = messageManager // add to cash
+	if accountManager, exists := m.accountManagers[userID]; exists {
+		return accountManager, nil
+	}
 
-	return m.chatManager, nil
+	accountManager, err := account.New(userID)
+	if err != nil {
+		return nil, err
+	}
+	m.accountManagers[userID] = accountManager
+	return accountManager, err
 }

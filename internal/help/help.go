@@ -3,19 +3,28 @@ package help
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"net/url"
 
 	"github.com/goccy/go-json"
+	"github.com/mahdi-cpp/contacts-api/internal/config"
 	"github.com/mahdi-cpp/iris-tools/mygin"
 
-	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
-	"testing"
 
 	"github.com/google/uuid"
 )
+
+type Error struct {
+	Message string `json:"message"`
+	Code    int    `json:"code"`
+}
+
+func SendError(c *mygin.Context, message string, code int) {
+	c.JSON(http.StatusBadRequest, mygin.H{"message": message, "code": code})
+}
 
 // GetUserID از Gin context، user_id را به صورت string دریافت می‌کند.
 func GetUserID(c *mygin.Context) (uuid.UUID, bool) {
@@ -47,77 +56,6 @@ func GetUserID(c *mygin.Context) (uuid.UUID, bool) {
 	return id, true
 }
 
-// MakeRequest Helper function to make HTTP requests
-func MakeRequest(t *testing.T, method, endpoint string, queryParams map[string]interface{}, body interface{}) ([]byte, error) {
-
-	// Build URL with query parameters
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("parsing URL: %w", err)
-	}
-
-	if queryParams != nil {
-		q := u.Query()
-		for key, value := range queryParams {
-			q.Add(key, fmt.Sprintf("%v", value))
-		}
-		u.RawQuery = q.Encode()
-	}
-
-	// Marshal body if provided
-	var bodyReader io.Reader
-	if body != nil {
-		jsonData, err := json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("marshaling body: %w", err)
-		}
-		bodyReader = bytes.NewReader(jsonData)
-	}
-
-	fmt.Println(u.String())
-	fmt.Println("")
-
-	// create request
-	req, err := http.NewRequest(method, u.String(), bodyReader)
-	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	// Execute request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("executing request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check status code
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("status %d: %s", resp.StatusCode, resp.Status)
-	}
-
-	// ReadChat response
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading response: %w", err)
-	}
-
-	return respBody, nil
-}
-
-// IsValidUUID checks if a given string is a valid UUID (v4 or v7).
-// It returns a boolean and an error if parsing fails.
-//func IsValidUUID(s uuid.UUID) (bool, error) {
-//	_, err := uuid.Parse(s)
-//	if err != nil {
-//		return false, fmt.Errorf("invalid UUID format: %w", err)
-//	}
-//	return true, nil
-//}
-
 func GetFileSize(filepath string) (int64, error) {
 	fileInfo, err := os.Stat(filepath)
 	if err != nil {
@@ -148,4 +86,114 @@ func StrPtr(str string) *string {
 
 func BoolPtr(bool bool) *bool {
 	return &bool
+}
+
+func MakeRequestBody(method, endpoint string, body interface{}) (*http.Response, error) {
+
+	// Build URL with query parameters
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("parsing URL: %w", err)
+	}
+
+	// Marshal body if provided
+	var bodyReader io.Reader
+
+	jsonData, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling body: %w", err)
+	}
+	bodyReader = bytes.NewReader(jsonData)
+
+	fmt.Println(u.String())
+	fmt.Println("")
+
+	// create request
+	req, err := http.NewRequest(method, u.String(), bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	req.Header.Set("user_id", config.Mahdi.String())
+
+	// Execute request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+
+	return resp, nil
+}
+
+func MakeRequestParam(method, endpoint string, queryParams interface{}) ([]byte, error) {
+
+	// ۱. تبدیل پارامترهای کوئری (struct یا map) به map[string]interface{} با استفاده از JSON
+	var paramsMap map[string]interface{}
+
+	if queryParams != nil {
+		// Marshal کردن به JSON برای تبدیل struct به بایت
+		data, err := json.Marshal(queryParams)
+		if err != nil {
+			return nil, fmt.Errorf("marshalling query params to json: %w", err)
+		}
+
+		// Unmarshal کردن JSON به نقشه (map) برای استخراج پارامترها بر اساس تگ‌های JSON
+		if err := json.Unmarshal(data, &paramsMap); err != nil {
+			return nil, fmt.Errorf("unmarshalling json to map: %w", err)
+		}
+	}
+
+	// ۲. ساخت URL با پارامترهای کوئری
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("parsing URL: %w", err)
+	}
+
+	if paramsMap != nil {
+		q := u.Query()
+		for key, value := range paramsMap {
+			// اضافه کردن فقط مقادیر غیر خالی
+			valStr := fmt.Sprintf("%v", value)
+			if valStr != "" {
+				q.Add(key, valStr)
+			}
+		}
+		u.RawQuery = q.Encode()
+	}
+
+	fullURL := u.String()
+	// این خط را می‌توانید برای دیباگ کردن حذف کنید
+	// fmt.Println(fullURL)
+
+	// ۳. ساخت درخواست HTTP
+	req, err := http.NewRequest(method, fullURL, nil) // body برای کوئری‌ها nil است
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	// ۴. اجرای درخواست
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// ۵. بررسی وضعیت کد پاسخ
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	// ۶. خواندن بدنه پاسخ
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	return respBody, nil
 }

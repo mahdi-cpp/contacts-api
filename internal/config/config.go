@@ -8,8 +8,26 @@ import (
 	"github.com/google/uuid"
 )
 
-const RootDir = "/app/iris/com.iris.messages"
-const usersDir = "users"
+const (
+	RootDir = "/app/iris/com.iris.contacts/"
+	users   = "users"
+)
+
+func GetPath(file string) string {
+	return filepath.Join(RootDir, file)
+}
+
+func GetUserPath(userID string) string {
+	pp := filepath.Join(RootDir, users, userID)
+	fmt.Println(pp)
+	return pp
+}
+
+func GetUserMetadataPath(id string) string {
+	pp := filepath.Join(RootDir, users, id, "metadata")
+	fmt.Println(pp)
+	return pp
+}
 
 var (
 	Mahdi    uuid.UUID
@@ -109,14 +127,4 @@ func Init() {
 	if err != nil {
 		log.Fatalf("failed to parse MessageID: %v", err)
 	}
-}
-
-func GetPath(file string) string {
-	return filepath.Join(RootDir, file)
-}
-
-func GetUserPath(phone string, file string) string {
-	pp := filepath.Join(RootDir, usersDir, phone, file)
-	fmt.Println(pp)
-	return pp
 }
